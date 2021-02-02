@@ -1,121 +1,94 @@
+process.env.NODE_ENV = "test"
+
 const request = require("supertest");
+
 
 const app = require("../app");
 const db = require("../db");
-const Book = require("../models/book");
 
-describe("Books Routes Test", function () {
 
-  beforeEach(async function () {
-    await db.query("DELETE FROM books");
+// isbn of sample book
+let book_isbn;
 
-    let data = {
-        "isbn": "0691161518",
-        "amazon_url": "http://a.co/eobPtX2",
-        "author": "Matthew Lane",
-        "language": "english",
-        "pages": 264,
-        "publisher": "Princeton University Press",
-        "title": "Power-Up: Unlocking the Hidden Mathematics in Video Games",
-        "year": 2017
-      }
 
-    let data2 = {
-        "isbn": "0691199999",
-        "amazon_url": "http://a.co/eobPtjtj",
-        "author": "Another Author",
-        "language": "english",
-        "pages": 444,
-        "publisher": "Princeton University Press",
-        "title": "Mathematics in Video Games",
-        "year": 2020
-      }
+beforeEach(async () => {
+  let result = await db.query(`
+    INSERT INTO 
+      books (isbn, amazon_url,author,language,pages,publisher,title,year)   
+      VALUES(
+        '123432122', 
+        'https://amazon.com/taco', 
+        'Elie', 
+        'English', 
+        100,  
+        'Nothing publishers', 
+        'my first book', 2008) 
+      RETURNING isbn`);
 
-    const b1 = await db.query(
-        `INSERT INTO books (
-              isbn,
-              amazon_url,
-              author,
-              language,
-              pages,
-              publisher,
-              title,
-              year) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-           RETURNING isbn,
-                     amazon_url,
-                     author,
-                     language,
-                     pages,
-                     publisher,
-                     title,
-                     year`,
-        [
-          data.isbn,
-          data.amazon_url,
-          data.author,
-          data.language,
-          data.pages,
-          data.publisher,
-          data.title,
-          data.year
-        ]
-      );
+  book_isbn = result.rows[0].isbn
+});
 
-      const b2 = await db.query(
-        `INSERT INTO books (
-              isbn,
-              amazon_url,
-              author,
-              language,
-              pages,
-              publisher,
-              title,
-              year) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-           RETURNING isbn,
-                     amazon_url,
-                     author,
-                     language,
-                     pages,
-                     publisher,
-                     title,
-                     year`,
-        [
-          data.isbn,
-          data.amazon_url,
-          data.author,
-          data.language,
-          data.pages,
-          data.publisher,
-          data.title,
-          data.year
-        ]
-      );
-  });
 
-/** POST /   bookData => {book: newBook}  */
-describe("POST /books/", function () {
-    test("can add book with correct data", async function () {
-      let book = await request(app)
-        .post("/books")
+describe("POST /books", function () {
+  test("Creates a new book", async function () {
+    const response = await request(app)
+        .post(`/books`)
         .send({
-            "isbn": "99999999",
-            "amazon_url": "http://a.co/eobPtjtj",
-            "author": "Test Author",
-            "language": "english",
-            "pages": 22,
-            "publisher": "Princeton University Press",
-            "title": "A Really Great Book Title",
-            "year": 2001
-          });
-
-        expect(response.statusCode).toBe(201);
-        expect(response.body.book).toHaveProperty("isbn");    
-    });
+          'isbn': '32794782',
+          'amazon_url': "https://taco.com",
+          'author': "mctest",
+          'language': "english",
+          'pages': '1000',
+          'publisher': "yeah right",
+          'title': "amazing times",
+          'year': '2000'
+        });
+    expect(response.statusCode).toBe(201);
+    expect(response.body.book).toHaveProperty("isbn");
   });
 
-
-afterAll(async function() {
-    await db.end();
+  test("Prevents creating book without required title", async function () {
+    const response = await request(app)
+        .post(`/books`)
+        .send({year: 2000});
+    expect(response.statusCode).toBe(400);
   });
+});
+
+
+describe("GET /books", function () {
+  test("Gets a list of 1 book", async function () {
+    const response = await request(app).get(`/books`);
+    const books = response.body.books;
+    expect(books).toHaveLength(1);
+    expect(books[0]).toHaveProperty("isbn");
+    expect(books[0]).toHaveProperty("amazon_url");
+  });
+});
+
+
+describe("GET /books/:isbn", function () {
+  test("Gets a single book", async function () {
+    const response = await request(app)
+        .get(`/books/${book_isbn}`)
+    expect(response.body.book).toHaveProperty("isbn");
+    expect(response.body.book.isbn).toBe(book_isbn);
+  });
+
+  test("Responds with 404 if can't find book in question", async function () {
+    const response = await request(app)
+        .get(`/books/999`)
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+
+
+afterEach(async function () {
+  await db.query("DELETE FROM BOOKS");
+});
+
+
+afterAll(async function () {
+  await db.end()
+});
