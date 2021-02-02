@@ -2,12 +2,10 @@ process.env.NODE_ENV = "test"
 
 const request = require("supertest");
 
-
 const app = require("../app");
 const db = require("../db");
 
 
-// isbn of sample book
 let book_isbn;
 
 beforeEach(async () => {
@@ -117,14 +115,12 @@ describe("PUT /books/:id", function () {
   });
 
   test("Responds 404 if can't find book in question", async function () {
-    // delete book first
     await request(app)
         .delete(`/books/${book_isbn}`)
     const response = await request(app).delete(`/books/${book_isbn}`);
     expect(response.statusCode).toBe(404);
   });
 });
-
 
 describe("DELETE /books/:id", function () {
   test("Deletes a single a book", async function () {
